@@ -1,0 +1,187 @@
+import { useState, useEffect } from 'react';
+import axios from 'axios';
+import Navbar from '../../components/Navbar';
+import { useToast } from '../../context/ToastContext';
+import { useTranslation } from 'react-i18next';
+import ConfirmDialog from '../../components/ConfirmDialog';
+
+const ManageCrops = () => {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const [crops, setCrops] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editingCrop, setEditingCrop] = useState(null);
+  const [formData, setFormData] = useState({ name: '', category: '' });
+  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null, type: 'danger' });
+
+  useEffect(() => {
+    fetchCrops();
+  }, []);
+
+  const fetchCrops = async () => {
+    try {
+      const response = await axios.get('/api/crops');
+      setCrops(response.data);
+    } catch (error) {
+      console.error('Error fetching crops:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (editingCrop) {
+        await axios.patch(`/api/crops/${editingCrop.id}`, formData);
+      } else {
+        await axios.post('/api/crops', formData);
+      }
+      fetchCrops();
+      setShowForm(false);
+      setEditingCrop(null);
+      setFormData({ name: '', category: '' });
+    } catch (error) {
+      toast.error(error.response?.data?.error || t('messages.operationFailed'));
+    }
+  };
+
+  const handleEdit = (crop) => {
+    setEditingCrop(crop);
+    setFormData({ name: crop.name, category: crop.category });
+    setShowForm(true);
+  };
+
+  const handleDelete = async (id) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: t('extension.deleteCrop'),
+      message: t('extension.confirmDeleteCrop'),
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          await axios.delete(`/api/crops/${id}`);
+          setCrops(crops.filter(c => c.id !== id));
+          setConfirmDialog({ ...confirmDialog, isOpen: false });
+        } catch (error) {
+          toast.error(error.response?.data?.error || t('messages.failedToDeleteCrop'));
+          setConfirmDialog({ ...confirmDialog, isOpen: false });
+        }
+      }
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="flex items-center justify-center h-96">
+          <div className="text-xl">{t('common.loading')}</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
+      
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold">{t('extension.manageCrops')}</h1>
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="bg-primary text-white px-4 py-2 rounded hover:bg-secondary"
+          >
+            {showForm ? t('common.cancel') : t('extension.addCrop')}
+          </button>
+        </div>
+
+        {showForm && (
+          <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 className="text-xl font-bold mb-4">{editingCrop ? t('extension.editCrop') : t('extension.addNewCrop')}</h2>
+            <form onSubmit={handleSubmit}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-gray-700 mb-2">{t('extension.cropName')}</label>
+                  <input
+                    type="text"
+                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-700 mb-2">{t('extension.category')}</label>
+                  <input
+                    type="text"
+                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  />
+                </div>
+              </div>
+              <button
+                type="submit"
+                className="bg-primary text-white px-6 py-2 rounded hover:bg-secondary"
+              >
+                {editingCrop ? t('common.update') : t('common.create')}
+              </button>
+            </form>
+          </div>
+        )}
+
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="text-left py-3 px-4">{t('common.id')}</th>
+                  <th className="text-left py-3 px-4">{t('common.name')}</th>
+                  <th className="text-left py-3 px-4">{t('extension.category')}</th>
+                  <th className="text-left py-3 px-4">{t('common.actions')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {crops.map((crop) => (
+                  <tr key={crop.id} className="border-b hover:bg-gray-50">
+                    <td className="py-3 px-4">{crop.id}</td>
+                    <td className="py-3 px-4 font-semibold">{crop.name}</td>
+                    <td className="py-3 px-4">{crop.category}</td>
+                    <td className="py-3 px-4">
+                      <button
+                        onClick={() => handleEdit(crop)}
+                        className="text-blue-600 hover:text-blue-800 mr-4"
+                      >
+                        {t('common.edit')}
+                      </button>
+                      <button
+                        onClick={() => handleDelete(crop.id)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        {t('common.delete')}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        type={confirmDialog.type}
+      />
+    </div>
+  );
+};
+
+export default ManageCrops;
