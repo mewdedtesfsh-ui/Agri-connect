@@ -1,13 +1,4 @@
 services:
-  # PostgreSQL Database
-  - type: pserv
-    name: agriconnect-db
-    env: docker
-    plan: free
-    databases:
-      - name: agriconnect
-        user: agriconnect
-
   # Backend API
   - type: web
     name: agriconnect-backend
@@ -29,16 +20,11 @@ services:
       - key: JWT_EXPIRES_IN
         value: 24h
       - key: CORS_ORIGIN
-        fromService:
-          type: web
-          name: agriconnect-frontend
-          property: host
+        value: "*"
 
   # Frontend
   - type: static
     name: agriconnect-frontend
-    env: static
-    plan: free
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: ./frontend/dist
     routes:
@@ -51,3 +37,7 @@ services:
           type: web
           name: agriconnect-backend
           property: host
+
+databases:
+  - name: agriconnect-db
+    plan: free
